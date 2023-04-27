@@ -1,13 +1,22 @@
 package main
 
 import (
-	repo "bookAPI/repository"
+	"bookAPI/db"
 	"bookAPI/routers"
+	"log"
 )
 
 func main() {
 	var PORT = ":8080"
 
-	repo.Init()
+	// repo.Init()
+	// routers.StartServer().Run(PORT)
+	err := db.Connect()
+	if err != nil {
+		log.Println("failed to connect DB", err)
+	}
+
+	log.Println("Database Connected")
+
 	routers.StartServer().Run(PORT)
 }

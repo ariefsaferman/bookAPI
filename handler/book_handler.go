@@ -1,11 +1,12 @@
 package handler
 
 import (
+	"bookAPI/db"
 	"bookAPI/entity"
-	"bookAPI/repository"
 	"bookAPI/utils/response"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -13,13 +14,33 @@ import (
 )
 
 func GetAllBook(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, gin.H{
-		"data": repository.DataBooks,
-	})
+	var books []entity.Book
+	sqlStatement := `SELECT * FROM books;`
+
+	rows, err := db.DB.Query(sqlStatement)
+	if err != nil {
+		response.SendError(ctx, http.StatusBadRequest, errors.New("bad query").Error(), err.Error())
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var book entity.Book
+		err := rows.Scan(&book.ID, &book.Title, &book.Author, &book.Description)
+		if err != nil {
+			log.Println("error: ", err)
+			return
+		}
+		books = append(books, book)
+	}
+
+	response.SendSuccess(ctx, http.StatusOK, books)
 }
 
 func AddBook(ctx *gin.Context) {
 	var newBook entity.BookDTO
+	sqlStatement := `INSERT INTO books(title, author, description) 
+	VALUES($1, $2, $3) Returning *`
 
 	if err := ctx.ShouldBindJSON(&newBook); err != nil {
 		response.SendError(ctx, http.StatusBadRequest, errors.New("bad request").Error(), err.Error())
@@ -27,8 +48,11 @@ func AddBook(ctx *gin.Context) {
 	}
 
 	book := entity.ToBook(newBook)
-	book.ID = len(repository.DataBooks) + 1
-	repository.DataBooks = append(repository.DataBooks, book)
+	err := db.DB.QueryRow(sqlStatement, book.Title, book.Author, book.Description).Scan(&book.ID, &book.Title, &book.Author, &book.Description)
+	if err != nil {
+		response.SendError(ctx, http.StatusBadRequest, errors.New("bad query").Error(), err.Error())
+		return
+	}
 
 	response.SendSuccess(ctx, http.StatusOK, book)
 }
@@ -36,20 +60,12 @@ func AddBook(ctx *gin.Context) {
 func GetBookById(ctx *gin.Context) {
 	bookID := ctx.Param("bookID")
 	bookIdInt, _ := strconv.Atoi(bookID)
-	condition := false
 	var book entity.Book
+	sqlStatement := `SELECT * FROM books WHERE id = $1`
 
-	for _, val := range repository.DataBooks {
-		if val.ID == bookIdInt {
-			book = val
-			condition = true
-			break
-		}
-
-	}
-
-	if !condition {
-		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "book is not found")
+	err := db.DB.QueryRow(sqlStatement, bookIdInt).Scan(&book.ID, &book.Title, &book.Author, &book.Description)
+	if err != nil {
+		response.SendError(ctx, http.StatusBadRequest, errors.New("bad query").Error(), err.Error())
 		return
 	}
 
@@ -60,8 +76,8 @@ func GetBookById(ctx *gin.Context) {
 func UpdateBook(ctx *gin.Context) {
 	bookID := ctx.Param("bookID")
 	bookIdInt, _ := strconv.Atoi(bookID)
-	condition := false
 	var book entity.BookDTO
+	sqlStatement := `UPDATE books SET title = $2, author = $3, description = $4 WHERE id = $1`
 
 	if err := ctx.ShouldBindJSON(&book); err != nil {
 		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "bad request body")
@@ -69,17 +85,10 @@ func UpdateBook(ctx *gin.Context) {
 	}
 
 	updatedBook := entity.ToBook(book)
-	for i, val := range repository.DataBooks {
-		if bookIdInt == val.ID {
-			updatedBook.ID = val.ID
-			condition = true
-			repository.DataBooks[i] = updatedBook
-			break
-		}
-	}
-
-	if !condition {
-		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "book is not found")
+	updatedBook.ID = bookIdInt
+	_, err := db.DB.Exec(sqlStatement, bookIdInt, updatedBook.Title, updatedBook.Author, updatedBook.Description)
+	if err != nil {
+		response.SendError(ctx, http.StatusBadRequest, errors.New("bad query").Error(), err.Error())
 		return
 	}
 
@@ -90,18 +99,11 @@ func UpdateBook(ctx *gin.Context) {
 func DeleteBook(ctx *gin.Context) {
 	bookID := ctx.Param("bookID")
 	bookIdInt, _ := strconv.Atoi(bookID)
-	condition := false
+	sqlStatement := `DELETE FROM books WHERE id = $1;`
 
-	for i, val := range repository.DataBooks {
-		if bookIdInt == val.ID {
-			repository.DataBooks = append(repository.DataBooks[:i], repository.DataBooks[i+1:]...)
-			condition = true
-			break
-		}
-	}
-
-	if !condition {
-		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "book is not found")
+	_, err := db.DB.Exec(sqlStatement, bookIdInt)
+	if err != nil {
+		response.SendError(ctx, http.StatusBadRequest, errors.New("bad query").Error(), err.Error())
 		return
 	}
 
