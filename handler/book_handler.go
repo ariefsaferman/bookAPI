@@ -3,6 +3,8 @@ package handler
 import (
 	"bookAPI/entity"
 	"bookAPI/repository"
+	"bookAPI/utils/response"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -20,7 +22,7 @@ func AddBook(ctx *gin.Context) {
 	var newBook entity.BookDTO
 
 	if err := ctx.ShouldBindJSON(&newBook); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		response.SendError(ctx, http.StatusBadRequest, errors.New("bad request").Error(), err.Error())
 		return
 	}
 
@@ -28,9 +30,7 @@ func AddBook(ctx *gin.Context) {
 	book.ID = len(repository.DataBooks) + 1
 	repository.DataBooks = append(repository.DataBooks, book)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"book": book,
-	})
+	response.SendSuccess(ctx, http.StatusOK, book)
 }
 
 func GetBookById(ctx *gin.Context) {
@@ -49,16 +49,11 @@ func GetBookById(ctx *gin.Context) {
 	}
 
 	if !condition {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-			"error_status":  "Data Not Found",
-			"error_message": fmt.Sprintf("book with id %v is not found", bookIdInt),
-		})
+		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "book is not found")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"book": book,
-	})
+	response.SendSuccess(ctx, http.StatusOK, book)
 
 }
 
@@ -69,7 +64,7 @@ func UpdateBook(ctx *gin.Context) {
 	var book entity.BookDTO
 
 	if err := ctx.ShouldBindJSON(&book); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "bad request body")
 		return
 	}
 
@@ -84,16 +79,11 @@ func UpdateBook(ctx *gin.Context) {
 	}
 
 	if !condition {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-			"error_status":  "Data Not Found",
-			"error_message": fmt.Sprintf("book with id %v is not found", bookIdInt),
-		})
+		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "book is not found")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"book": updatedBook,
-	})
+	response.SendSuccess(ctx, http.StatusOK, updatedBook)
 
 }
 
@@ -111,10 +101,7 @@ func DeleteBook(ctx *gin.Context) {
 	}
 
 	if !condition {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-			"error_status":  "Data Not Found",
-			"error_message": fmt.Sprintf("book with id %v is not found", bookIdInt),
-		})
+		response.SendError(ctx, http.StatusNotFound, errors.New("BAD_REQUEST").Error(), "book is not found")
 		return
 	}
 
