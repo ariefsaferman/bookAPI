@@ -1,11 +1,14 @@
 package db
 
 import (
-	"database/sql"
+	"bookAPI/entity"
 	"fmt"
 	"log"
 
+	"gorm.io/driver/postgres"
+
 	_ "github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 const (
@@ -17,20 +20,26 @@ const (
 )
 
 var (
-	DB  *sql.DB
+	db  *gorm.DB
 	err error
 )
 
-func Connect() error {
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+func ConnectDB() (*gorm.DB, error) {
+	config := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 
-	DB, err = sql.Open("postgres", psqlInfo)
+	db, err = gorm.Open(postgres.Open(config), &gorm.Config{})
 	if err != nil {
-		log.Println(err)
-		return err
+		log.Fatal("error connecting to database: ", err)
+		return nil, err
 	}
 
-	return nil
+	db.Debug().AutoMigrate(entity.Book{})
+
+	return db, nil
+}
+
+func GetDB() *gorm.DB {
+	return db
 }
